@@ -1,0 +1,51 @@
+contracts:
+  # Tick-level streaming via reqMktData.
+  # generic_tick_list "233" requests: last, lastSize, rtVolume, rtTime, vwap.
+  - symbol: AAPL
+    sec_type: STK
+    exchange: SMART
+    primary_exchange: NASDAQ
+    currency: USD
+    data_type: tick
+    generic_tick_list: "233"
+
+  - symbol: MSFT
+    sec_type: STK
+    exchange: SMART
+    primary_exchange: NASDAQ
+    currency: USD
+    data_type: tick
+    generic_tick_list: "233"
+
+  # 5-second real-time bars via reqRealTimeBars.
+  # IB only supports 5-second granularity through this endpoint.
+  - symbol: SPY
+    sec_type: STK
+    exchange: SMART
+    primary_exchange: ARCA
+    currency: USD
+    data_type: bar
+    bar_size: "5 secs"
+    what_to_show: TRADES
+    use_rth: true
+
+  # Minute bars (and any bar_size other than "5 secs") via
+  # reqHistoricalData(keepUpToDate=True).
+  - symbol: ES
+    sec_type: FUT
+    exchange: CME
+    currency: USD
+    last_trade_date: "202509"
+    data_type: bar
+    bar_size: "1 min"
+    what_to_show: TRADES
+    use_rth: false
+    history_duration: "1 D"
+
+  # Forex pair example.
+  - symbol: EURUSD
+    sec_type: CASH
+    exchange: IDEALPRO
+    currency: USD
+    data_type: tick
+    generic_tick_list: ""

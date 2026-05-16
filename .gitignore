@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Type checkers
+.mypy_cache/
+.pytype/
+.ruff_cache/
+
+# Distribution / packaging
+MANIFEST
+
+# Editor & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Secrets — never commit
+.env
+
+# AI coding assistants
+.ai/
+.coding
+.claude
