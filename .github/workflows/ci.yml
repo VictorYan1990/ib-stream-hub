@@ -23,7 +23,7 @@ jobs:
         run: pip install -r requirements.txt
 
       # ── Lint ────────────────────────────────────────────────────────────
-      - name: Lint with ruff
+      - name: Check for bugs and security issues (ruff)
         run: ruff check .
 
       # ── Type check ──────────────────────────────────────────────────────

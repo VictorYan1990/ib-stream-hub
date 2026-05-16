@@ -1,3 +1,16 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+# Only enforce rules that catch real bugs or security issues.
+# Stylistic / aspirational checks (unused imports, formatting, etc.) are omitted.
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors (syntax-level problems)
+    "B",   # flake8-bugbear (likely bugs and design issues)
+    "S",   # flake8-bandit (security)
+]
+ignore = [
+    "S101",  # use of assert — fine in tests
+]
