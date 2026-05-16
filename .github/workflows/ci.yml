@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+
+jobs:
+  quality:
+    name: Build, Lint, Type-check, Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Lint ────────────────────────────────────────────────────────────
+      - name: Lint with ruff
+        run: ruff check .
+
+      # ── Type check ──────────────────────────────────────────────────────
+      - name: Type-check with mypy
+        run: mypy ib_stream/
+
+      # ── Tests + coverage ────────────────────────────────────────────────
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ \
+            --cov=ib_stream \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=70
+
+      # ── Upload coverage report as artifact ──────────────────────────────
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
