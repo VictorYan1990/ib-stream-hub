@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import main as main_module
 from main import _drain_queues, _STALENESS_TIMEOUT, DEFAULT_CONFIG
@@ -49,7 +49,9 @@ class TestDrainQueues:
         ingestor.get_queue.side_effect = lambda sym: {"AAPL": q_a, "MSFT": q_b}[sym]
 
         seen = []
-        original_info = lambda fmt, *args: seen.append(fmt % args)
+
+        def original_info(fmt, *args):
+            seen.append(fmt % args)
 
         with patch("main.logger") as mock_log:
             mock_log.info.side_effect = original_info

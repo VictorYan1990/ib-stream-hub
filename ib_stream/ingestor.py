@@ -2,12 +2,12 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from ib_insync import IB, Contract
 from ib_insync.contract import CFD, Forex, Future, Index, Stock
-from ib_insync.objects import BarData, RealTimeBar
+from ib_insync.objects import BarData
 
 from .config import ContractConfig, DataType
 from .gateway import IBGateway

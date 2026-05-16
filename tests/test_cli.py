@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from ib_stream.cli import _build_parser, cli
 

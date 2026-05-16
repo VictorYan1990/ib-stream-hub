@@ -8,8 +8,6 @@ All connection settings come from environment variables / .env file.
 import argparse
 import logging
 import sys
-from pathlib import Path
-
 from main import DEFAULT_CONFIG, main
 
 
