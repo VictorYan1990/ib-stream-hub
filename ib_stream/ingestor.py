@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 _REALTIME_BAR_SIZE = "5 secs"
 _STALENESS_TIMEOUT = 360.0
+# After this many multiples of the staleness timeout with the API still up,
+# assume IB has silently orphaned our subscriptions and force a re-subscribe.
+_STALENESS_RESTART_MULTIPLIER = 2
 
 
 def _partition_key(cfg: ContractConfig) -> str:
@@ -184,14 +187,28 @@ class Ingestor:
         logger.info("All subscriptions cancelled")
 
     async def watchdog(self, timeout: float = _STALENESS_TIMEOUT) -> None:
-        """Keep the process alive and warn when a symbol goes silent."""
+        """Keep the process alive; warn on silence, force re-subscribe on
+        prolonged silence with the API still up (defends against IB's
+        unreliable "data maintained" claim after a 1102 reconnect)."""
+        restart_threshold = timeout * _STALENESS_RESTART_MULTIPLIER
         while True:
             await asyncio.sleep(timeout)
             now = time.monotonic()
+            very_stale: List[str] = []
             for key, last in self._last_publish.items():
                 age = now - last
                 if age > timeout:
                     logger.warning("[%s] No data published in %.0fs", key, age)
+                if age > restart_threshold:
+                    very_stale.append(key)
+
+            if very_stale and self._gateway.is_connected:
+                logger.error(
+                    "%d subscription(s) silent for >%.0fs while API still "
+                    "connected — forcing re-subscribe: %s",
+                    len(very_stale), restart_threshold, ", ".join(very_stale),
+                )
+                self.restart()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -254,6 +271,17 @@ class Ingestor:
             keepUpToDate=True,
         )
 
+        # reqHistoricalData returns with the backfill already loaded. If
+        # requested, publish those completed bars now — excluding the last one,
+        # which is the still-forming current interval the live handler emits.
+        if cfg.backfill:
+            backfill_bars = list(bars)[:-1]
+            for bar in backfill_bars:
+                self._sink_publish_hist(sink, cfg, key, bar)
+            logger.info(
+                "Backfilled %d bar(s) for %s", len(backfill_bars), cfg.symbol
+            )
+
         def on_bar(bar_list, has_new_bar, _cfg=cfg, _key=key, _sink=sink):
             if has_new_bar and bar_list:
                 self._last_publish[_key] = time.monotonic()
@@ -261,3 +289,7 @@ class Ingestor:
 
         bars.updateEvent += on_bar
         return _Subscription(cfg.symbol, "hist_bar", contract, bars, on_bar)
+
+    def _sink_publish_hist(self, sink: Sink, cfg: ContractConfig, key: str, bar: BarData) -> None:
+        self._last_publish[key] = time.monotonic()
+        sink.publish(key, _hist_bar_payload(cfg, bar))

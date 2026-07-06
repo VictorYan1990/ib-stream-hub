@@ -220,6 +220,30 @@ class TestWatchdog:
     def test_staleness_timeout_constant_is_positive(self):
         assert _STALENESS_TIMEOUT > 0
 
+    async def test_restarts_when_silent_beyond_threshold_and_api_up(self, ingestor):
+        import time
+        ingestor._gateway.is_connected = True
+        ingestor._last_publish["AAPL:STK"] = time.monotonic() - 1000.0  # very stale
+
+        with patch.object(ingestor, "restart") as mock_restart:
+            with pytest.raises(Exception):
+                import asyncio
+                await asyncio.wait_for(ingestor.watchdog(timeout=0.05), timeout=0.2)
+
+        mock_restart.assert_called()
+
+    async def test_does_not_restart_when_api_disconnected(self, ingestor):
+        import time
+        ingestor._gateway.is_connected = False
+        ingestor._last_publish["AAPL:STK"] = time.monotonic() - 1000.0  # very stale
+
+        with patch.object(ingestor, "restart") as mock_restart:
+            with pytest.raises(Exception):
+                import asyncio
+                await asyncio.wait_for(ingestor.watchdog(timeout=0.05), timeout=0.2)
+
+        mock_restart.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Tick subscription event handler
@@ -340,6 +364,62 @@ class TestHistBarHandler:
         self._start_hist(mock_gateway, mock_sink)
         _, kwargs = mock_gateway.ib.reqHistoricalData.call_args
         assert kwargs["keepUpToDate"] is True
+
+    def test_no_backfill_published_by_default(self, mock_gateway, mock_sink):
+        self._start_hist(mock_gateway, mock_sink)
+        # backfill defaults to False → nothing published at subscribe time
+        mock_sink.publish.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Historical bar backfill (cfg.backfill=True)
+# ---------------------------------------------------------------------------
+
+class _FakeBarList(list):
+    """A list subclass mimicking ib_insync's BarDataList (has updateEvent)."""
+
+    def __init__(self, items):
+        super().__init__(items)
+        self.updateEvent = MagicMock()
+
+
+class TestHistBarBackfill:
+    def _start_with_backfill(self, mock_gateway, mock_sink, bars, backfill=True):
+        cfg = ContractConfig(
+            symbol="QQQ", data_type=DataType.BAR, bar_size="1 min", backfill=backfill,
+        )
+        ingestor = Ingestor.from_contracts(mock_gateway, [cfg], mock_sink)
+        mock_gateway.ib.reqHistoricalData.return_value = _FakeBarList(bars)
+        ingestor.start()
+        return ingestor
+
+    def test_publishes_backfill_excluding_forming_bar(self, mock_gateway, mock_sink):
+        b1, b2, b3 = MagicMock(), MagicMock(), MagicMock()
+        self._start_with_backfill(mock_gateway, mock_sink, [b1, b2, b3])
+        # 3 bars in → 2 published (last is the still-forming bar, skipped)
+        assert mock_sink.publish.call_count == 2
+        for call in mock_sink.publish.call_args_list:
+            key, payload = call[0]
+            assert key == "QQQ:STK"
+            assert payload["type"] == "hist_bar"
+
+    def test_backfill_disabled_publishes_nothing(self, mock_gateway, mock_sink):
+        b1, b2, b3 = MagicMock(), MagicMock(), MagicMock()
+        self._start_with_backfill(mock_gateway, mock_sink, [b1, b2, b3], backfill=False)
+        mock_sink.publish.assert_not_called()
+
+    def test_single_bar_backfill_publishes_nothing(self, mock_gateway, mock_sink):
+        # Only the forming bar present → nothing to backfill
+        self._start_with_backfill(mock_gateway, mock_sink, [MagicMock()])
+        mock_sink.publish.assert_not_called()
+
+    def test_empty_backfill_is_safe(self, mock_gateway, mock_sink):
+        self._start_with_backfill(mock_gateway, mock_sink, [])
+        mock_sink.publish.assert_not_called()
+
+    def test_backfill_updates_last_publish(self, mock_gateway, mock_sink):
+        self._start_with_backfill(mock_gateway, mock_sink, [MagicMock(), MagicMock()])
+        assert "QQQ:STK" in mock_sink.publish.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------

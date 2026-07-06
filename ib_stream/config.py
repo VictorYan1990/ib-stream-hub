@@ -49,7 +49,12 @@ class ContractConfig(BaseModel):
     what_to_show: str = "TRADES"
     use_rth: bool = True
     # Duration string passed to reqHistoricalData for the initial backfill.
-    history_duration: str = "1 D"
+    # IB duration units are S, D, W, M, Y (no "hour"); "3600 S" == 1 hour.
+    history_duration: str = "3600 S"
+    # When True, publish the historical bars that reqHistoricalData returns
+    # (the initial backfill) before streaming live updates. Only applies to
+    # hist_bar subscriptions (bar_size other than "5 secs").
+    backfill: bool = False
 
     @model_validator(mode="after")
     def _default_id(self) -> "ContractConfig":

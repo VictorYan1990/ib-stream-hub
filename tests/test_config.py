@@ -48,7 +48,8 @@ class TestContractConfig:
         assert c.bar_size == "1 min"
         assert c.what_to_show == "TRADES"
         assert c.use_rth is True
-        assert c.history_duration == "1 D"
+        assert c.history_duration == "3600 S"
+        assert c.backfill is False
 
     def test_custom_values(self):
         c = ContractConfig(
@@ -76,6 +77,10 @@ class TestContractConfig:
     def test_last_trade_date(self):
         c = ContractConfig(symbol="ES", last_trade_date="202509")
         assert c.last_trade_date == "202509"
+
+    def test_backfill_can_be_enabled(self):
+        c = ContractConfig(symbol="ES", data_type=DataType.BAR, backfill=True)
+        assert c.backfill is True
 
     def test_explicit_id_preserved(self):
         c = ContractConfig(id="my_aapl", symbol="AAPL")

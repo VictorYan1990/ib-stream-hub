@@ -131,6 +131,30 @@ class TestOnError:
             gateway._on_error(0, 2000, "boundary", None)
             mock_log.error.assert_called_once()
 
+    def test_1100_logs_warning_without_firing_reconnect(self, gateway):
+        callback = MagicMock()
+        gateway.on_reconnected = callback
+        with patch("ib_stream.gateway.logger") as mock_log:
+            gateway._on_error(-1, 1100, "connectivity lost", None)
+            mock_log.warning.assert_called_once()
+        callback.assert_not_called()
+
+    def test_1101_fires_reconnected_callback(self, gateway):
+        callback = MagicMock()
+        gateway.on_reconnected = callback
+        gateway._on_error(-1, 1101, "restored, data lost", None)
+        callback.assert_called_once()
+
+    def test_1102_fires_reconnected_callback(self, gateway):
+        callback = MagicMock()
+        gateway.on_reconnected = callback
+        gateway._on_error(-1, 1102, "restored, data maintained", None)
+        callback.assert_called_once()
+
+    def test_1102_without_callback_does_not_raise(self, gateway):
+        gateway.on_reconnected = None
+        gateway._on_error(-1, 1102, "restored", None)  # must not raise
+
 
 class TestOnDisconnected:
     def test_records_disconnect_timestamp(self, gateway):

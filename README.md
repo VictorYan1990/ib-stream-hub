@@ -1,6 +1,6 @@
 # ib-stream-hub
 
-A lightweight Python service that connects to an Interactive Brokers Gateway or TWS instance and streams real-time market data — ticks and OHLCV bars — and publishes each update to configurable **sinks** (AWS SQS, AWS Kinesis, or an in-process queue) through declarative **pipelines**.
+A lightweight Python Application that connects to an Interactive Brokers Gateway or TWS instance and streams real-time market data — ticks and OHLCV bars — and publishes each update to configurable **sinks** (AWS SQS, AWS Kinesis, or an in-process queue) through declarative **pipelines**.
 
 ## Features
 
@@ -56,10 +56,10 @@ cp .env.example .env
 
 ```ini
 IB_HOST=127.0.0.1
-IB_PORT=7497        # TWS paper: 7497 | TWS live: 7496 | Gateway paper: 4002 | Gateway live: 4001
+IB_PORT=4001        # TWS paper: 7497 | TWS live: 7496 | Gateway paper: 4002 | Gateway live: 4001
 IB_CLIENT_ID=1
 IB_TIMEOUT=10.0
-IB_READONLY=true
+IB_READONLY=true    # For testign purpose. Avoid accidential trading actions. 
 ```
 
 > `.env` is gitignored and must never be committed.
@@ -103,7 +103,8 @@ contracts:
     bar_size: "1 min"
     what_to_show: TRADES
     use_rth: false
-    history_duration: "1 D"
+    history_duration: "3600 S"   # IB units: S, D, W, M, Y — "3600 S" = 1 hour
+    backfill: true               # publish the initial history before live bars
 ```
 
 #### Contract fields reference
@@ -122,7 +123,8 @@ contracts:
 | `bar_size` | no | `"1 min"` | IB bar size string; `"5 secs"` uses `reqRealTimeBars`, all others use `reqHistoricalData` |
 | `what_to_show` | no | `TRADES` | `TRADES`, `MIDPOINT`, `BID`, `ASK`, … |
 | `use_rth` | no | `true` | Regular trading hours only |
-| `history_duration` | no | `"1 D"` | Initial backfill window for historical bars |
+| `history_duration` | no | `"3600 S"` | Backfill window for historical bars; IB duration units are `S`, `D`, `W`, `M`, `Y` (`"3600 S"` = 1 hour) |
+| `backfill` | no | `false` | If `true`, publish the initial history returned by `reqHistoricalData` (excluding the still-forming bar) before streaming live bars. Applies to `hist_bar` subscriptions only |
 
 ### Sinks (`ib_stream/config/sinks.yaml`)
 
@@ -231,53 +233,6 @@ ib-stream-hub/
 3. **`build_pipelines`** resolves `contracts.yaml`, `sinks.yaml`, and `pipelines.yaml` by id into runtime `ResolvedPipeline(contract, sink)` objects, instantiating each sink via the `create_sink()` factory.
 4. **`Ingestor`** subscribes each pipeline's contract (`reqMktData` / `reqRealTimeBars` / `reqHistoricalData`), serialises every update to a dict, and forwards it to that pipeline's `sink.publish(key, payload)`. The partition `key` encodes the contract identity (symbol, sec_type, expiry) so futures with different expirations stay ordered separately.
 
-## Extending
-
-### Add a new sink type
-
-Implement the `Sink` interface and register it — no changes needed elsewhere:
-
-```python
-from ib_stream.sink import Sink, SINK_REGISTRY
-
-class MyBrokerSink(Sink):
-    @classmethod
-    def from_options(cls, options: dict) -> "MyBrokerSink":
-        return cls(**options)
-
-    def publish(self, key: str, payload: dict) -> None:
-        ...  # send payload keyed by `key`
-
-SINK_REGISTRY["mybroker"] = MyBrokerSink
-```
-
-Then reference it from `sinks.yaml` with `type: mybroker`.
-
-### Test / local runs without AWS
-
-Use the `thread` sink — messages stay in an in-memory queue you can drain or inspect:
-
-```python
-from ib_stream.sink import ThreadSink
-
-sink = ThreadSink()
-sink.publish("AAPL:STK", {"last": 150.2})
-key, payload = sink.get_nowait()
-```
-
-## Development
-
-```bash
-# Run tests
-pytest
-
-# Lint (bug & security rules) and type-check
-ruff check .
-mypy ib_stream/
-
-# Run with verbose logging against a paper account
-IB_PORT=7497 python main.py --log-level DEBUG
-```
 
 ## License
 

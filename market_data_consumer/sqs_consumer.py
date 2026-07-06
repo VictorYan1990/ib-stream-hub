@@ -62,6 +62,15 @@ class SQSConsumer:
             self._thread = None
         logger.info("SQS consumer stopped")
 
+    # AWS error codes signalling a client/server clock disagreement. Common on
+    # WSL2 after suspend/resume: the VM's clock lags real time until NTP catches
+    # up, which can take tens of seconds — a 1s retry hot-spins uselessly.
+    _CLOCK_SKEW_CODES = frozenset(
+        {"SignatureDoesNotMatch", "RequestExpired", "RequestTimeTooSkewed"}
+    )
+    _CLOCK_SKEW_BACKOFF = 30.0
+    _DEFAULT_BACKOFF = 1.0
+
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
@@ -70,10 +79,23 @@ class SQSConsumer:
                     MaxNumberOfMessages=self._max_messages,
                     WaitTimeSeconds=self._wait_time_seconds,
                 )
-            except (BotoCoreError, ClientError) as exc:
+            except ClientError as exc:
+                code = exc.response.get("Error", {}).get("Code", "")
+                if code in self._CLOCK_SKEW_CODES:
+                    logger.warning(
+                        "SQS receive failed (%s) — likely clock skew; "
+                        "backing off %.0fs. Root cause: fix system clock "
+                        "(e.g. `sudo hwclock -s` on WSL after suspend).",
+                        code, self._CLOCK_SKEW_BACKOFF,
+                    )
+                    self._stop.wait(self._CLOCK_SKEW_BACKOFF)
+                else:
+                    logger.warning("SQS receive failed: %s", exc)
+                    self._stop.wait(self._DEFAULT_BACKOFF)
+                continue
+            except BotoCoreError as exc:
                 logger.warning("SQS receive failed: %s", exc)
-                # Back off briefly on error so we don't hot-spin on repeated failures.
-                self._stop.wait(1.0)
+                self._stop.wait(self._DEFAULT_BACKOFF)
                 continue
 
             for msg in resp.get("Messages", []):

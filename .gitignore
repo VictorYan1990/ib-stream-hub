@@ -42,7 +42,12 @@ MANIFEST
 # Secrets — never commit
 .env
 
-# AI coding assistants
-.ai/
+# AI assistants
+# Commit shared config: AGENTS.md, CLAUDE.md, .agents/, and the symlinks
+# under .cursor/ and .claude/ that point at .agents/.
+# Ignore only personal, scratch, or secret-bearing files:
+.ai/                       # scratch prompts / working notes
 .coding
-.claude
+.claude/settings.local.json
+*.local.json
+.cursor/mcp.json           # may hold secrets; template it if you commit one

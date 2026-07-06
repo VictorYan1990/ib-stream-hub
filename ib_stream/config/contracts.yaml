@@ -34,6 +34,8 @@ contracts:
 
   # Minute bars (and any bar_size other than "5 secs") via
   # reqHistoricalData(keepUpToDate=True).
+  # backfill: true publishes the initial history (here 1 hour = "3600 S")
+  # before streaming live bars. IB duration units are S, D, W, M, Y.
   - id: es_fut
     symbol: ES
     sec_type: FUT
@@ -44,7 +46,8 @@ contracts:
     bar_size: "1 min"
     what_to_show: TRADES
     use_rth: false
-    history_duration: "1 D"
+    history_duration: "3600 S"
+    backfill: true
 
   # Forex pair example.
   - id: eurusd

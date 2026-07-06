@@ -4,8 +4,7 @@
 #
 # Supported types: sqs, kinesis, thread.
 sinks:
-  # AWS SQS FIFO queue.
-  # Use a FIFO queue (URL ending in .fifo) to preserve per-symbol ordering.
+  # AWS SQS queue.
   # Set "Content-based deduplication" OFF on the queue — the sink generates
   # a UUID MessageDeduplicationId per message so identical ticks are never dropped.
   - id: market_data_sqs

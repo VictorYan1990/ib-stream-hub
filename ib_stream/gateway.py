@@ -84,6 +84,24 @@ class IBGateway:
         self._reconnect_task = asyncio.ensure_future(self._reconnect_loop())
 
     def _on_error(self, req_id: int, error_code: int, error_string: str, contract) -> None:
+        # IB connectivity codes: fire on the IB Gateway ↔ IB backend link,
+        # NOT on the local TCP socket. After a laptop suspend/resume the
+        # loopback socket to our app often survives, so disconnectedEvent
+        # never fires — but the upstream subscriptions have gone silent.
+        # We treat 1101/1102 as a "soft reconnect" and re-issue everything.
+        # (1102 promises "data maintained" but this is unreliable in practice.)
+        if error_code == 1100:
+            logger.warning("IB connectivity lost (1100): %s", error_string)
+            return
+        if error_code in (1101, 1102):
+            logger.info(
+                "IB connectivity restored (%d): %s — re-issuing subscriptions",
+                error_code, error_string,
+            )
+            if self.on_reconnected:
+                self.on_reconnected()
+            return
+
         # Codes < 2000 are warnings/informational; >= 2000 are real errors.
         if error_code >= 2000:
             logger.error(
