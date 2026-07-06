@@ -2,6 +2,18 @@
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
+[tool.mypy]
+python_version = "3.12"
+
+# Third-party libraries without bundled type information. Ignoring their
+# missing stubs does not weaken type-checking of our own code.
+[[tool.mypy.overrides]]
+module = [
+    "boto3",
+    "botocore.*",
+]
+ignore_missing_imports = true
+
 [tool.ruff]
 # Only enforce rules that catch real bugs or security issues.
 # Stylistic / aspirational checks (unused imports, formatting, etc.) are omitted.
