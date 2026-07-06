@@ -1,56 +1,80 @@
-"""Entry point: connect to IB Gateway and stream market data to stdout."""
+"""Entry point: connect to IB Gateway and stream market data through pipelines."""
 
-import asyncio
 import logging
 import sys
-from pathlib import Path
 
 from ib_insync import util
 
-from ib_stream.config import ConnectionSettings, load_config
+from ib_stream.cli import (
+    DEFAULT_CONTRACTS_CONFIG,
+    DEFAULT_PIPELINES_CONFIG,
+    DEFAULT_SINKS_CONFIG,
+    DEFAULT_SOURCES_CONFIG,
+    _build_parser,
+)
+from ib_stream.config import (
+    ConnectionSettings,
+    load_config,
+    load_pipelines_config,
+    load_sinks_config,
+)
 from ib_stream.gateway import IBGateway
 from ib_stream.ingestor import Ingestor
+from ib_stream.pipeline import build_pipelines
+from market_data_consumer import SQSConsumer, load_sources_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG = Path(__file__).parent / "ib_stream" / "config" / "contracts.yaml"
-_STALENESS_TIMEOUT = 60.0
+LOG_FORMAT = (
+    "%(asctime)s %(levelname)-8s %(filename)s:%(lineno)d %(name)s: %(message)s"
+)
+
+# Re-exported for backwards compatibility / convenience.
+__all__ = [
+    "DEFAULT_CONTRACTS_CONFIG",
+    "DEFAULT_SINKS_CONFIG",
+    "DEFAULT_PIPELINES_CONFIG",
+    "DEFAULT_SOURCES_CONFIG",
+    "LOG_FORMAT",
+    "main",
+]
 
 
-async def _drain_queues(ingestor: Ingestor) -> None:
-    """Consume all queues and print each item. Replace with your own logic."""
-    async def drain(symbol: str) -> None:
-        q = ingestor.get_queue(symbol)
-        while True:
-            try:
-                item = await asyncio.wait_for(q.get(), timeout=_STALENESS_TIMEOUT)
-                logger.info("[%s] %s", symbol, item)
-            except asyncio.TimeoutError:
-                logger.warning("[%s] No data received in %.0fs", symbol, _STALENESS_TIMEOUT)
+def main(argv: list[str] | None = None) -> None:
+    args = _build_parser().parse_args(argv if argv is not None else [])
 
-    await asyncio.gather(*(drain(sym) for sym in ingestor.queues))
+    logging.basicConfig(level=args.log_level, format=LOG_FORMAT)
 
+    conn = ConnectionSettings()
+    app_cfg = load_config(args.contracts)
+    sinks_cfg = load_sinks_config(args.sinks)
+    pipelines_cfg = load_pipelines_config(args.pipelines)
+    sources_cfg = load_sources_config(args.sources)
 
-def main(config_path: str | None = None) -> None:
-    conn = ConnectionSettings()   # reads IB_* env vars / .env file
-    cfg = load_config(config_path or DEFAULT_CONFIG)
+    # Start the consumer first so it's ready to drain the queue as soon as
+    # the ingester begins publishing. SQSConsumer.from_source validates that
+    # the selected source is of type 'sqs'.
+    consumer = SQSConsumer.from_source(sources_cfg.sources[0])
+    consumer.start()
+
+    pipelines = build_pipelines(app_cfg, sinks_cfg, pipelines_cfg)
 
     gateway = IBGateway.from_config(conn)
-    ingestor = Ingestor(gateway, cfg.contracts)
-    gateway.on_reconnected = ingestor.restart  # re-subscribe after every reconnect
+    ingestor = Ingestor(gateway, pipelines)
+    gateway.on_reconnected = ingestor.restart
 
     gateway.connect()
     ingestor.start()
 
     try:
-        util.run(_drain_queues(ingestor))
+        util.run(ingestor.watchdog())
     except KeyboardInterrupt:
         logger.info("Shutting down …")
     finally:
         ingestor.stop()
         gateway.disconnect()
+        consumer.stop()
 
 
 if __name__ == "__main__":
-    from ib_stream.cli import cli
-    cli(sys.argv[1:])
+    main(sys.argv[1:])

@@ -1,0 +1,13 @@
+# Sources this consumer polls. Each entry has a unique `id`, a `type`
+# selecting the provider implementation (currently only `sqs`), and
+# provider-specific `options`.
+#
+# NOTE: this file is intentionally a standalone copy of the matching entry
+# in ib_stream/config/sinks.yaml so the consumer stays decoupled from the
+# ingester's configuration. Keep the queue URL in sync when it changes.
+sources:
+  - id: market_data_sqs
+    type: sqs
+    options:
+      region: us-east-1
+      queue_url: https://sqs.us-east-1.amazonaws.com/825052841055/ibsh-dev-md-fut-es-5mins

@@ -101,7 +101,8 @@ class IBGateway:
         attempt = 0
         while not self.ib.isConnected():
             attempt += 1
-            sleep_for = delay + random.uniform(0, _RECONNECT_JITTER)
+            # Reconnect backoff jitter — not security-sensitive.
+            sleep_for = delay + random.uniform(0, _RECONNECT_JITTER)  # noqa: S311
             logger.info("Reconnect attempt %d in %.1fs …", attempt, sleep_for)
             await asyncio.sleep(sleep_for)
             try:

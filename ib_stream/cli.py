@@ -1,27 +1,56 @@
-"""CLI entry point for ib-stream-hub.
+"""Command-line argument definitions for ib-stream-hub.
 
-Parses command-line arguments and delegates to main.main().
-All contract definitions come from the config file.
-All connection settings come from environment variables / .env file.
+This module only defines the argument parser and the default config paths.
+Argument parsing, logger setup, and orchestration live in ``main.main()``.
 """
 
 import argparse
-import logging
-import sys
-from main import DEFAULT_CONFIG, main
+from pathlib import Path
+
+# Config paths are resolved relative to the project root (the parent of the
+# ib_stream package directory), so they are independent of the caller's CWD.
+_ROOT = Path(__file__).parent.parent
+_INGESTOR_CONFIG_DIR = _ROOT / "ib_stream" / "config"
+_CONSUMER_CONFIG_DIR = _ROOT / "market_data_consumer" / "config"
+
+DEFAULT_CONTRACTS_CONFIG = _INGESTOR_CONFIG_DIR / "contracts.yaml"
+DEFAULT_SINKS_CONFIG = _INGESTOR_CONFIG_DIR / "sinks.yaml"
+DEFAULT_PIPELINES_CONFIG = _INGESTOR_CONFIG_DIR / "pipelines.yaml"
+DEFAULT_SOURCES_CONFIG = _CONSUMER_CONFIG_DIR / "sources.yaml"
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ib-stream",
-        description="Stream real-time market data from Interactive Brokers Gateway.",
+        description=(
+            "Stream real-time market data from Interactive Brokers Gateway "
+            "through configurable pipelines."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "-c", "--config",
+        "-c", "--contracts",
         metavar="PATH",
-        default=str(DEFAULT_CONFIG),
+        default=str(DEFAULT_CONTRACTS_CONFIG),
         help="Path to the contracts YAML configuration file.",
+    )
+    parser.add_argument(
+        "-s", "--sinks",
+        metavar="PATH",
+        default=str(DEFAULT_SINKS_CONFIG),
+        help="Path to the sinks YAML configuration file.",
+    )
+    parser.add_argument(
+        "-p", "--pipelines",
+        metavar="PATH",
+        default=str(DEFAULT_PIPELINES_CONFIG),
+        help="Path to the pipelines YAML configuration file.",
+    )
+    parser.add_argument(
+        "--sources",
+        metavar="PATH",
+        default=str(DEFAULT_SOURCES_CONFIG),
+        help="Path to the consumer sources YAML configuration file.",
     )
     parser.add_argument(
         "--log-level",
@@ -31,18 +60,3 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Logging verbosity.",
     )
     return parser
-
-
-def cli(argv: list[str] | None = None) -> None:
-    args = _build_parser().parse_args(argv)
-
-    logging.basicConfig(
-        level=args.log_level,
-        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
-    )
-
-    main(config_path=args.config)
-
-
-if __name__ == "__main__":
-    cli(sys.argv[1:])

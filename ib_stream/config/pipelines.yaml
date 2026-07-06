@@ -1,0 +1,20 @@
+# Pipelines to provision. Each entry wires one contract (by id, from
+# contracts.yaml) to one sink (by id, from sinks.yaml). Set `enabled: false`
+# to keep a pipeline declared but inactive.
+pipelines:
+
+  - id: spy_to_sqs
+    contract: spy
+    sink: market_data_sqs
+    enabled: true
+
+  - id: es_to_sqs
+    contract: es_fut
+    sink: market_data_sqs
+    enabled: true
+
+  # Example of routing the same/another contract to a different sink. Note that this is not used in the current project.
+  - id: eurusd_to_kinesis
+    contract: eurusd
+    sink: market_data_kinesis
+    enabled: false

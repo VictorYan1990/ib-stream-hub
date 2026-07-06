@@ -1,7 +1,8 @@
 contracts:
   # Tick-level streaming via reqMktData.
   # generic_tick_list "233" requests: last, lastSize, rtVolume, rtTime, vwap.
-  - symbol: AAPL
+  - id: aapl
+    symbol: AAPL
     sec_type: STK
     exchange: SMART
     primary_exchange: NASDAQ
@@ -9,7 +10,8 @@ contracts:
     data_type: tick
     generic_tick_list: "233"
 
-  - symbol: MSFT
+  - id: msft
+    symbol: MSFT
     sec_type: STK
     exchange: SMART
     primary_exchange: NASDAQ
@@ -19,7 +21,8 @@ contracts:
 
   # 5-second real-time bars via reqRealTimeBars.
   # IB only supports 5-second granularity through this endpoint.
-  - symbol: SPY
+  - id: spy
+    symbol: SPY
     sec_type: STK
     exchange: SMART
     primary_exchange: ARCA
@@ -31,11 +34,12 @@ contracts:
 
   # Minute bars (and any bar_size other than "5 secs") via
   # reqHistoricalData(keepUpToDate=True).
-  - symbol: ES
+  - id: es_fut
+    symbol: ES
     sec_type: FUT
     exchange: CME
     currency: USD
-    last_trade_date: "202509"
+    last_trade_date: "202609"
     data_type: bar
     bar_size: "1 min"
     what_to_show: TRADES
@@ -43,7 +47,8 @@ contracts:
     history_duration: "1 D"
 
   # Forex pair example.
-  - symbol: EURUSD
+  - id: eurusd
+    symbol: EURUSD
     sec_type: CASH
     exchange: IDEALPRO
     currency: USD

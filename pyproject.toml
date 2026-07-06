@@ -12,5 +12,7 @@ select = [
     "S",   # flake8-bandit (security)
 ]
 ignore = [
-    "S101",  # use of assert — fine in tests
+    "S101",   # use of assert — fine in tests
+    "E501",   # line too long — stylistic, not a bug
+    "B017",   # assert on broad Exception — acceptable in tests
 ]

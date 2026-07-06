@@ -1,0 +1,27 @@
+# Available sinks. Each entry has a unique `id`, a `type` selecting the
+# provider implementation (see ib_stream/sink.py: SINK_REGISTRY), and an
+# `options` block carrying provider-specific settings.
+#
+# Supported types: sqs, kinesis, thread.
+sinks:
+  # AWS SQS FIFO queue.
+  # Use a FIFO queue (URL ending in .fifo) to preserve per-symbol ordering.
+  # Set "Content-based deduplication" OFF on the queue — the sink generates
+  # a UUID MessageDeduplicationId per message so identical ticks are never dropped.
+  - id: market_data_sqs
+    type: sqs
+    options:
+      region: us-east-1
+      queue_url: https://sqs.us-east-1.amazonaws.com/825052841055/ibsh-dev-md-fut-es-5mins
+
+  # AWS Kinesis Data Stream (partitioned by contract key).
+  - id: market_data_kinesis
+    type: kinesis
+    options:
+      region: us-east-1
+      stream_name: ib-market-data
+
+  # In-process queue — no external provider. Ideal for local runs and tests.
+  - id: local_debug
+    type: thread
+    options: {}
